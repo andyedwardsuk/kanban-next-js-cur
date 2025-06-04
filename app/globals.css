@@ -183,20 +183,32 @@
   0% {
     opacity: 0.6;
     transform: scale(0.98);
-    border-color: var(--primary);
-    box-shadow: 0 0 0 1px var(--primary-foreground);
+    border-color: var(--muted-foreground);
+    box-shadow: 0 0 0 1px var(--muted-foreground/20);
   }
   50% {
     opacity: 0.9;
     transform: scale(1.01);
-    border-color: var(--primary);
-    box-shadow: 0 0 10px 1px var(--primary);
+    border-color: var(--muted-foreground);
+    box-shadow: 0 0 10px 1px var(--muted-foreground/30);
   }
   100% {
     opacity: 0.6;
     transform: scale(0.98);
-    border-color: var(--primary);
-    box-shadow: 0 0 0 1px var(--primary-foreground);
+    border-color: var(--muted-foreground);
+    box-shadow: 0 0 0 1px var(--muted-foreground/20);
+  }
+}
+
+/* Quick fade out animation for skeleton cards */
+@keyframes quickFadeOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.95);
   }
 }
 
@@ -204,7 +216,12 @@
   animation: skeletonPulse 1.2s ease-in-out infinite;
   border-width: 2px;
   border-style: dashed;
-  border-color: var(--primary);
+  border-color: var(--muted-foreground/40);
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.skeleton-card.fade-out {
+  animation: quickFadeOut 0.2s forwards cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Highlight task cards during drag */
@@ -258,4 +275,52 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Smooth task card animations */
+[data-task-id] {
+  transition: transform 0.3s ease, opacity 0.3s ease, box-shadow 0.2s ease;
+  will-change: transform, opacity;
+}
+
+/* Add smooth transitions for all task cards in a column */
+[data-column-id] [data-task-id] {
+  transition: all 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+/* Improve dragged item appearance */
+.is-dragging [data-task-id].dragging {
+  transform: scale(1.02);
+  z-index: 10;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.1);
+}
+
+/* Appear animation for skeleton cards */
+@keyframes appear {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-appear {
+  animation: appear 0.3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+}
+
+/* Task container for smooth reordering */
+.task-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+  gap: 0.5rem;
+  position: relative;
+  transition: height 0.3s ease;
+}
+
+.task-container > * {
+  transition: transform 0.3s ease, opacity 0.3s ease;
 }

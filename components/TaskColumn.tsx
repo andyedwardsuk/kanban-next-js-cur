@@ -98,10 +98,35 @@ export default function TaskColumn({ column, onUpdate }: TaskColumnProps) {
       }
     };
 
+    // Handle drag end events to clean up skeletons
+    const handleDragEnd = () => {
+      // Add fade-out class to all skeleton cards in this column
+      const skeletonCards =
+        columnRef.current?.querySelectorAll(".skeleton-card");
+      if (skeletonCards) {
+        skeletonCards.forEach((card) => {
+          card.classList.add("fade-out");
+        });
+      }
+
+      // Delay clearing visual states to allow for animation
+      setTimeout(() => {
+        setIsDropTarget(false);
+        setDropIndex(null);
+        setDraggedTaskId(null);
+      }, 200); // Match animation duration
+    };
+
     // Listen for drag start events from Pragmatic drag and drop
     document.addEventListener(
       "pragmatic-dnd-drag-start",
       handleDragStart as EventListener
+    );
+
+    // Listen for drag end events
+    document.addEventListener(
+      "pragmatic-dnd-drag-end",
+      handleDragEnd as EventListener
     );
 
     const cleanup = dropTargetForElements({
@@ -166,10 +191,21 @@ export default function TaskColumn({ column, onUpdate }: TaskColumnProps) {
         // Save the final drop index before clearing state
         const finalDropIndex = dropIndex;
 
-        // Clear visual states
-        setIsDropTarget(false);
-        setDropIndex(null);
-        setDraggedTaskId(null);
+        // Add fade-out class to all skeleton cards in this column
+        const skeletonCards =
+          columnRef.current?.querySelectorAll(".skeleton-card");
+        if (skeletonCards) {
+          skeletonCards.forEach((card) => {
+            card.classList.add("fade-out");
+          });
+        }
+
+        // Delay clearing visual states to allow for animation
+        setTimeout(() => {
+          setIsDropTarget(false);
+          setDropIndex(null);
+          setDraggedTaskId(null);
+        }, 200); // Match animation duration
 
         const sourceData = args.source.data;
         if (!sourceData) {
@@ -263,6 +299,10 @@ export default function TaskColumn({ column, onUpdate }: TaskColumnProps) {
       document.removeEventListener(
         "pragmatic-dnd-drag-start",
         handleDragStart as EventListener
+      );
+      document.removeEventListener(
+        "pragmatic-dnd-drag-end",
+        handleDragEnd as EventListener
       );
       cleanup();
     };
@@ -362,7 +402,7 @@ export default function TaskColumn({ column, onUpdate }: TaskColumnProps) {
           </div>
         </CardHeader>
         <CardContent ref={contentRef} className="p-3 flex-grow overflow-y-auto">
-          <div className="space-y-2 relative">
+          <div className="relative task-container">
             {tasks.map((task, index) => {
               // Add skeleton placeholder before this task if this is the drop position
               const isDropPosition = dropIndex === index;
@@ -378,7 +418,9 @@ export default function TaskColumn({ column, onUpdate }: TaskColumnProps) {
                     </div>
                   )}
                   <div
-                    className={`relative ${isDraggedTask ? "opacity-40" : ""}`}
+                    className={`relative ${
+                      isDraggedTask ? "opacity-40" : ""
+                    } transition-all duration-300`}
                   >
                     <TaskCard task={task} />
                   </div>

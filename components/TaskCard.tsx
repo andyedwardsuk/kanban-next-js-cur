@@ -105,6 +105,20 @@ export default function TaskCard({ task }: TaskCardProps) {
         setIsDragging(false);
         // Remove the dragging class
         document.body.classList.remove("is-dragging");
+
+        // Dispatch custom event to notify columns about the drag end
+        const event = new CustomEvent("pragmatic-dnd-drag-end", {
+          detail: {
+            source: {
+              data: {
+                taskId: task.id,
+                columnId: task.columnId,
+              },
+            },
+          },
+          bubbles: true,
+        });
+        document.dispatchEvent(event);
       },
     });
 
@@ -126,9 +140,9 @@ export default function TaskCard({ task }: TaskCardProps) {
       <Card
         ref={cardRef}
         data-task-id={task.id}
-        className={`bg-card shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing ${
+        className={`bg-card shadow-sm hover:shadow-md transition-all duration-300 cursor-grab active:cursor-grabbing ${
           isDragging
-            ? "opacity-60 ring-2 ring-primary shadow-lg scale-[1.02]"
+            ? "opacity-60 ring-2 ring-primary shadow-lg scale-[1.02] dragging"
             : ""
         }`}
       >

@@ -2,19 +2,28 @@ import { Card } from "@/components/ui/card";
 
 export default function TaskCardSkeleton() {
   return (
-    <Card className="bg-card/30 shadow-sm h-[100px] skeleton-card">
-      <div className="flex flex-col p-3 px-4 h-auto">
-        {/* Title placeholder */}
-        <div className="w-3/4 h-4 bg-muted-foreground/20 rounded mb-3"></div>
+    <Card className="bg-card shadow-sm skeleton-card animate-appear mb-2 transition-opacity duration-200">
+      <div className="flex flex-col p-2 px-4">
+        {/* Top row with title and menu */}
+        <div className="flex justify-between items-start mb-1.5">
+          <div className="w-3/4 h-4 bg-gray-400/50 rounded"></div>
+          <div className="w-4 h-4 bg-gray-400/50 rounded-full"></div>
+        </div>
 
-        {/* Description placeholder (optional) */}
-        <div className="w-full h-3 bg-muted-foreground/10 rounded mb-2"></div>
-        <div className="w-2/3 h-3 bg-muted-foreground/10 rounded mb-4"></div>
+        {/* Description placeholder - shorter */}
+        <div className="w-full h-3 bg-gray-400/50 rounded mt-1.5 mb-1"></div>
+        <div className="w-2/3 h-3 bg-gray-400/50 rounded mb-2"></div>
 
-        {/* Bottom row placeholder */}
+        {/* Bottom row with assignee and status badge */}
         <div className="flex justify-between items-center mt-auto">
-          <div className="w-20 h-4 bg-muted-foreground/20 rounded"></div>
-          <div className="w-16 h-5 bg-muted-foreground/20 rounded-full"></div>
+          {/* Assignee placeholder */}
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 bg-gray-400/50 rounded-full"></div>
+            <div className="w-14 h-3 bg-gray-400/50 rounded"></div>
+          </div>
+
+          {/* Status badge placeholder */}
+          <div className="w-14 h-4 bg-gray-400/50 rounded-full"></div>
         </div>
       </div>
     </Card>
