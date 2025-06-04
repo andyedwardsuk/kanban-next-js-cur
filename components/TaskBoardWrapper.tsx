@@ -1,6 +1,6 @@
 "use client";
 
-import { Column } from "@/lib/db/schemas/schema";
+import { Column, Task } from "@/lib/db/schemas/schema";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -13,7 +13,7 @@ const TaskBoard = dynamic(() => import("./TaskBoard"), {
 });
 
 interface TaskBoardWrapperProps {
-  initialColumns: Column[];
+  initialColumns: (Column & { tasks?: Task[] })[];
 }
 
 export default function TaskBoardWrapper({
@@ -33,5 +33,9 @@ export default function TaskBoardWrapper({
     return () => clearTimeout(timeoutId);
   }, [router]);
 
-  return <TaskBoard initialColumns={initialColumns} />;
+  return (
+    <div className="h-full flex-1 flex flex-col">
+      <TaskBoard initialColumns={initialColumns} />
+    </div>
+  );
 }

@@ -8,7 +8,10 @@ import { Suspense } from "react";
 
 export default async function Home() {
   return (
-    <AppLayout title="Team Kanban Board">
+    <AppLayout
+      title="Team Kanban Board"
+      subtitle="Collaborate and track progress efficiently"
+    >
       <Suspense fallback={<TaskBoardSkeleton />}>
         <BoardContent />
       </Suspense>

@@ -3,7 +3,7 @@
 import { tasks } from "@/lib/db/schemas/schema";
 import { TaskFormInput, taskFormSchema } from "@/lib/db/schemas/task-schema";
 import { db } from "@/lib/db/server";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 /**
@@ -28,12 +28,16 @@ export async function addTask(formData: TaskFormInput) {
 
   try {
     // Get the highest order number in the column
-    const highestOrderTask = await db.query.tasks.findFirst({
-      where: (tasks, { eq }) => eq(tasks.columnId, data.columnId),
-      orderBy: (tasks, { desc }) => [desc(tasks.order)],
-    });
+    const highestOrderTask = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.columnId, data.columnId))
+      .orderBy(desc(tasks.order))
+      .limit(1);
 
-    const newOrder = highestOrderTask ? highestOrderTask.order + 1 : 1;
+    const newOrder = highestOrderTask.length
+      ? highestOrderTask[0].order + 1
+      : 1;
 
     console.log("Creating task with order:", newOrder);
 

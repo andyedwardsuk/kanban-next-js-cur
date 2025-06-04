@@ -1,8 +1,8 @@
 "use server";
 
-import { tasks } from "@/lib/db/schemas/schema";
+import { columns, tasks } from "@/lib/db/schemas/schema";
 import { db } from "@/lib/db/server";
-import { and, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gt, gte, lt, lte, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export type TaskFormData = {
@@ -14,12 +14,12 @@ export type TaskFormData = {
 
 export async function getTasks() {
   try {
-    const allTasks = await db.query.tasks.findMany({
-      with: {
-        column: true,
-      },
-      orderBy: (tasks, { asc }) => [asc(tasks.columnId), asc(tasks.order)],
-    });
+    // This is a simplified version that doesn't join with columns
+    // If you need column data, you'll need to fetch it separately
+    const allTasks = await db
+      .select()
+      .from(tasks)
+      .orderBy(tasks.columnId, tasks.order);
 
     return { tasks: allTasks };
   } catch (error) {
@@ -30,18 +30,25 @@ export async function getTasks() {
 
 export async function getTask(id: number) {
   try {
-    const task = await db.query.tasks.findFirst({
-      where: (tasks, { eq }) => eq(tasks.id, id),
-      with: {
-        column: true,
-      },
-    });
+    const task = await db.select().from(tasks).where(eq(tasks.id, id)).limit(1);
 
-    if (!task) {
+    if (!task.length) {
       return { error: "Task not found" };
     }
 
-    return { task };
+    // Get the column info separately if needed
+    const taskColumn = await db
+      .select()
+      .from(columns)
+      .where(eq(columns.id, task[0].columnId))
+      .limit(1);
+
+    return {
+      task: {
+        ...task[0],
+        column: taskColumn.length ? taskColumn[0] : null,
+      },
+    };
   } catch (error) {
     console.error("Error fetching task:", error);
     return { error: "Failed to fetch task" };
@@ -51,12 +58,16 @@ export async function getTask(id: number) {
 export async function createTask(data: TaskFormData) {
   try {
     // Get the highest order number in the column
-    const highestOrderTask = await db.query.tasks.findFirst({
-      where: (tasks, { eq }) => eq(tasks.columnId, data.columnId),
-      orderBy: (tasks, { desc }) => [desc(tasks.order)],
-    });
+    const highestOrderTask = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.columnId, data.columnId))
+      .orderBy(desc(tasks.order))
+      .limit(1);
 
-    const newOrder = highestOrderTask ? highestOrderTask.order + 1 : 1;
+    const newOrder = highestOrderTask.length
+      ? highestOrderTask[0].order + 1
+      : 1;
 
     const newTask = await db
       .insert(tasks)
@@ -121,13 +132,100 @@ export async function deleteTask(id: number) {
 
 export async function moveTask(id: number, columnId: number, newOrder: number) {
   try {
+    console.log("moveTask called with:", { id, columnId, newOrder });
+
     // Get the current task
-    const currentTask = await db.query.tasks.findFirst({
-      where: (tasks, { eq }) => eq(tasks.id, id),
+    const currentTask = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.id, id))
+      .limit(1);
+
+    if (!currentTask.length) {
+      return { error: "Task not found" };
+    }
+
+    const originalColumnId = currentTask[0].columnId;
+    const originalOrder = currentTask[0].order;
+
+    console.log("Current task info:", {
+      taskId: id,
+      originalColumnId,
+      originalOrder,
+      newColumnId: columnId,
+      newOrder,
     });
 
-    if (!currentTask) {
-      return { error: "Task not found" };
+    // If moving to a new column, we need to update orders in both columns
+    if (columnId !== originalColumnId) {
+      // Log target column tasks before updates
+      const targetColumnTasks = await db
+        .select()
+        .from(tasks)
+        .where(eq(tasks.columnId, columnId))
+        .orderBy(tasks.order);
+
+      console.log(
+        "Target column tasks before update:",
+        targetColumnTasks.map((t) => ({ id: t.id, order: t.order }))
+      );
+
+      // 1. First decrease order of tasks in the original column that come after the moved task
+      await db
+        .update(tasks)
+        .set({
+          order: sql`${tasks.order} - 1`,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(tasks.columnId, originalColumnId),
+            gt(tasks.order, originalOrder)
+          )
+        );
+
+      // 2. Increase order of tasks in the target column to make room for the new task
+      // We need to make space at the exact position specified by newOrder
+      await db
+        .update(tasks)
+        .set({
+          order: sql`${tasks.order} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(and(eq(tasks.columnId, columnId), gte(tasks.order, newOrder)));
+    } else {
+      // Same column reordering logic (unchanged)
+      if (originalOrder < newOrder) {
+        // Moving down
+        await db
+          .update(tasks)
+          .set({
+            order: sql`${tasks.order} - 1`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(tasks.columnId, columnId),
+              gt(tasks.order, originalOrder),
+              lte(tasks.order, newOrder)
+            )
+          );
+      } else if (originalOrder > newOrder) {
+        // Moving up
+        await db
+          .update(tasks)
+          .set({
+            order: sql`${tasks.order} + 1`,
+            updatedAt: new Date(),
+          })
+          .where(
+            and(
+              eq(tasks.columnId, columnId),
+              lt(tasks.order, originalOrder),
+              gte(tasks.order, newOrder)
+            )
+          );
+      }
     }
 
     // Update the task with new column and order
@@ -141,24 +239,48 @@ export async function moveTask(id: number, columnId: number, newOrder: number) {
       .where(eq(tasks.id, id))
       .returning();
 
-    // Reorder other tasks in the column if needed
-    if (columnId === currentTask.columnId) {
-      // Same column, reorder tasks
-      await db
-        .update(tasks)
-        .set({
-          order: sql`${tasks.order} - 1`,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(eq(tasks.columnId, columnId), eq(tasks.order, currentTask.order))
-        );
-    }
+    // Log final state of the column after all updates
+    const finalTargetColumnTasks = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.columnId, columnId))
+      .orderBy(tasks.order);
+
+    console.log(
+      "Target column tasks AFTER update:",
+      finalTargetColumnTasks.map((t) => ({ id: t.id, order: t.order }))
+    );
 
     revalidatePath("/");
     return { task: updatedTask[0] };
   } catch (error) {
     console.error("Error moving task:", error);
     return { error: "Failed to move task" };
+  }
+}
+
+/**
+ * Reorder tasks within a column
+ * @param columnId The column containing the tasks
+ * @param taskIds Array of task IDs in their new order
+ */
+export async function reorderTasks(columnId: number, taskIds: number[]) {
+  try {
+    // Update the order of each task based on its position in the taskIds array
+    for (let i = 0; i < taskIds.length; i++) {
+      await db
+        .update(tasks)
+        .set({
+          order: i + 1, // Order starts at 1
+          updatedAt: new Date(),
+        })
+        .where(and(eq(tasks.id, taskIds[i]), eq(tasks.columnId, columnId)));
+    }
+
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    console.error("Error reordering tasks:", error);
+    return { error: "Failed to reorder tasks" };
   }
 }

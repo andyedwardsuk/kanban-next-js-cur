@@ -32,6 +32,7 @@ import { assignees } from "@/lib/data/assignees";
 import { Task } from "@/lib/db/schemas/schema";
 import { TASK_STATUS } from "@/lib/db/schemas/task-schema";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { Edit } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -152,8 +153,17 @@ export default function TaskDialog({
       }}
     >
       <DialogContent className="sm:max-w-[400px]" showCloseButton={false}>
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Task" : "Create Task"}</DialogTitle>
+        <DialogHeader className="pb-2">
+          <DialogTitle>
+            {isEditing ? (
+              <div className="flex items-center">
+                <Edit className="mr-2 h-4 w-4" />
+                Edit Task
+              </div>
+            ) : (
+              "Create Task"
+            )}
+          </DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
@@ -245,20 +255,21 @@ export default function TaskDialog({
                 </FormItem>
               )}
             />
-            <DialogFooter className="gap-2 sm:gap-0 pt-2">
-              <div className="grid grid-cols-2 w-full gap-3">
+            <DialogFooter className="pt-2">
+              <div className="flex justify-end gap-2 w-full">
                 <Button
                   type="button"
-                  variant="outline"
+                  variant="ghost"
+                  size="sm"
                   onClick={handleCancel}
-                  className="w-full"
                 >
                   Cancel
                 </Button>
                 <Button
                   type="submit"
+                  size="sm"
                   disabled={isSubmitting}
-                  className="w-full"
+                  className="min-w-24"
                 >
                   {isSubmitting
                     ? "Saving..."

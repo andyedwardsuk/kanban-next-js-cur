@@ -1,31 +1,51 @@
 "use server";
 
-import { columns } from "@/lib/db/schemas/schema";
+import { columns, tasks } from "@/lib/db/schemas/schema";
 import { db } from "@/lib/db/server";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function getColumns() {
   try {
-    // First, fetch all columns
-    const allColumns = await db.query.columns.findMany({
-      orderBy: (columns, { asc }) => [asc(columns.order)],
-    });
-
-    // Then, for each column, fetch its tasks separately
-    const columnsWithTasks = await Promise.all(
-      allColumns.map(async (column) => {
-        const columnTasks = await db.query.tasks.findMany({
-          where: (tasks, { eq }) => eq(tasks.columnId, column.id),
-          orderBy: (tasks, { asc }) => [asc(tasks.order)],
-        });
-
-        return {
-          ...column,
-          tasks: columnTasks,
-        };
+    // Just use the SQL builder directly to avoid query building issues
+    const allColumns = await db
+      .select({
+        id: columns.id,
+        title: columns.title,
+        order: columns.order,
+        createdAt: columns.createdAt,
+        updatedAt: columns.updatedAt,
       })
-    );
+      .from(columns)
+      .orderBy(columns.order);
+
+    // Get all tasks
+    const allTasks = await db
+      .select({
+        id: tasks.id,
+        title: tasks.title,
+        description: tasks.description,
+        status: tasks.status,
+        columnId: tasks.columnId,
+        assigneeId: tasks.assigneeId,
+        order: tasks.order,
+        createdAt: tasks.createdAt,
+        updatedAt: tasks.updatedAt,
+      })
+      .from(tasks)
+      .orderBy(tasks.columnId, tasks.order);
+
+    // Group tasks by column
+    const columnsWithTasks = allColumns.map((column) => {
+      const columnTasks = allTasks
+        .filter((task) => task.columnId === column.id)
+        .sort((a, b) => a.order - b.order); // Explicitly sort by order
+
+      return {
+        ...column,
+        tasks: columnTasks,
+      };
+    });
 
     return { columns: columnsWithTasks };
   } catch (error) {
@@ -36,23 +56,26 @@ export async function getColumns() {
 
 export async function getColumn(id: number) {
   try {
-    const column = await db.query.columns.findFirst({
-      where: (columns, { eq }) => eq(columns.id, id),
-    });
+    const column = await db
+      .select()
+      .from(columns)
+      .where(eq(columns.id, id))
+      .limit(1);
 
-    if (!column) {
+    if (!column.length) {
       return { error: "Column not found" };
     }
 
     // Fetch tasks for this column separately
-    const columnTasks = await db.query.tasks.findMany({
-      where: (tasks, { eq }) => eq(tasks.columnId, column.id),
-      orderBy: (tasks, { asc }) => [asc(tasks.order)],
-    });
+    const columnTasks = await db
+      .select()
+      .from(tasks)
+      .where(eq(tasks.columnId, id))
+      .orderBy(tasks.order);
 
     return {
       column: {
-        ...column,
+        ...column[0],
         tasks: columnTasks,
       },
     };
@@ -65,11 +88,15 @@ export async function getColumn(id: number) {
 export async function createColumn(title: string) {
   try {
     // Get the highest order number
-    const highestOrderColumn = await db.query.columns.findFirst({
-      orderBy: (columns, { desc }) => [desc(columns.order)],
-    });
+    const highestOrderColumn = await db
+      .select()
+      .from(columns)
+      .orderBy(desc(columns.order))
+      .limit(1);
 
-    const newOrder = highestOrderColumn ? highestOrderColumn.order + 1 : 1;
+    const newOrder = highestOrderColumn.length
+      ? highestOrderColumn[0].order + 1
+      : 1;
 
     const newColumn = await db
       .insert(columns)

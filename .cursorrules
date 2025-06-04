@@ -1,0 +1,12 @@
+- This is a Next.js project using React 19.
+- Prefer Tailwind CSS for styling.
+- Use the latest version of Shadcn/ui for components.
+- Every time we need to run a shadcn command, we should use `npx shadcn@latest`
+
+- This should be achieved through using server components where possible,
+- using server actions where possible,
+- and using Next.js 15.
+
+- If you generating validation schemas, forms, actions, working with db
+- THEN ALWAYS use the database schema from @/lib/db/schema.ts as A SINGLE SOURCE OF TRUTH.
+- NEVER MODIFY OR REMOVE ANYTHING FROM THE DATABASE SCHEMA, UNLESS I EXPLICITLY TELL YOU TO DO SO.

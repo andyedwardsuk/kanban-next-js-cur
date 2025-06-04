@@ -24,9 +24,10 @@ import { deleteTask } from "@/lib/actions/tasks";
 import { assignees } from "@/lib/data/assignees";
 import { Task } from "@/lib/db/schemas/schema";
 import { TASK_STATUS, TaskStatus } from "@/lib/db/schemas/task-schema";
+import { draggable } from "@atlaskit/pragmatic-drag-and-drop/element/adapter";
 import { Edit, MoreHorizontal, Trash } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import TaskDialog from "./TaskDialog";
 
@@ -48,6 +49,8 @@ const statusConfig = {
 export default function TaskCard({ task }: TaskCardProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleteAlertOpen, setIsDeleteAlertOpen] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
   // Find the assignee for this task
@@ -58,6 +61,55 @@ export default function TaskCard({ task }: TaskCardProps) {
   // Get the status configuration based on task status
   const taskStatus = (task.status || TASK_STATUS.TODO) as TaskStatus;
   const status = statusConfig[taskStatus];
+
+  // Set up draggable functionality
+  useEffect(() => {
+    const element = cardRef.current;
+    if (!element) return;
+
+    // Make the card draggable
+    const cleanup = draggable({
+      element,
+      getInitialData: () => ({
+        taskId: task.id,
+        columnId: task.columnId,
+        task: task,
+      }),
+      onDragStart: () => {
+        setIsDragging(true);
+        // Add a dragging class to the document body for global styling
+        document.body.classList.add("is-dragging");
+
+        // Dispatch custom event to notify columns about the drag
+        const event = new CustomEvent("pragmatic-dnd-drag-start", {
+          detail: {
+            source: {
+              data: {
+                taskId: task.id,
+                columnId: task.columnId,
+              },
+            },
+          },
+          bubbles: true,
+        });
+        document.dispatchEvent(event);
+
+        // Position the cursor at the center of the element for better dragging
+        return {
+          element: element.cloneNode(true) as HTMLElement,
+          offsetX: element.offsetWidth / 2,
+          offsetY: element.offsetHeight / 2,
+        };
+      },
+      onDrop: () => {
+        setIsDragging(false);
+        // Remove the dragging class
+        document.body.classList.remove("is-dragging");
+      },
+    });
+
+    return cleanup;
+  }, [task]);
 
   const handleDelete = async () => {
     await deleteTask(task.id);
@@ -71,8 +123,16 @@ export default function TaskCard({ task }: TaskCardProps) {
 
   return (
     <>
-      <Card className="bg-card shadow-sm hover:shadow-md transition-shadow">
-        <div className="flex flex-col p-3">
+      <Card
+        ref={cardRef}
+        data-task-id={task.id}
+        className={`bg-card shadow-sm hover:shadow-md transition-all duration-200 cursor-grab active:cursor-grabbing ${
+          isDragging
+            ? "opacity-60 ring-2 ring-primary shadow-lg scale-[1.02]"
+            : ""
+        }`}
+      >
+        <div className="flex flex-col p-3 px-4 h-auto">
           {/* Top row with title and menu */}
           <div className="flex justify-between items-start">
             <h3 className="font-medium">{task.title}</h3>
@@ -82,7 +142,7 @@ export default function TaskCard({ task }: TaskCardProps) {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 p-0 -mt-1 -mr-1"
+                  className="h-6 w-6 p-0 -mt-3 -mr-1"
                 >
                   <MoreHorizontal className="h-3.5 w-3.5" />
                 </Button>
@@ -138,7 +198,6 @@ export default function TaskCard({ task }: TaskCardProps) {
         </div>
       </Card>
 
-      {/* Edit Dialog */}
       <TaskDialog
         open={isDialogOpen}
         onOpenChange={setIsDialogOpen}
